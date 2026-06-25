@@ -1,0 +1,25 @@
+services:
+  vintagestory:
+    image: ghcr.io/merevge/vintagestory-server:latest
+    container_name: vintagestory-server
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    stop_grace_period: 60s
+    ports:
+      - "42420:42420/tcp"
+      - "42420:42420/udp"
+    volumes:
+      - ./data:/data           # world, mods, server cache, serverconfig.json
+    environment:
+      VS_CHANNEL: stable
+      VS_VERSION: ""           # pin e.g. "1.22.3"; empty = latest
+      VS_WHITELIST_MODE: "1"   # 0 = default (on for dedicated), 1 = off, 2 = on
+      # VS_SERVER_NAME: "My Vintage Story Server"
+      # VS_MAX_CLIENTS: "16"
+      # VS_PASSWORD: ""
+      # VS_MOTD: "Welcome {0}, may you survive well and prosper"
+      # Mods to auto-download (one id per line); dependencies are resolved too.
+      # VS_MODS: |
+      #   carryon
+      #   primitivesurvival

@@ -1,0 +1,5 @@
+# Runtime data created by docker compose (bind mounts)
+config/
+data/
+saves/
+mods/
