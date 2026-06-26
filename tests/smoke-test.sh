@@ -21,7 +21,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-wait_exec() { # container, sh-check, timeout
+wait_exec() {
   local c="$1" check="$2" d=$((SECONDS + ${3:-30}))
   while (( SECONDS < d )); do docker exec "$c" sh -c "$check" >/dev/null 2>&1 && return 0; sleep 2; done
   return 1
@@ -76,7 +76,6 @@ docker exec "$cid" sh -c 'ls /data/Mods/*.zip >/dev/null 2>&1' || fail "no mod d
 docker exec "$cid" sh -c 'ls /data/Mods' | grep -qi carryon || fail "carryon not downloaded"
 pass "carryon downloaded at runtime"
 
-# carryon 2.x (on VS 1.22) depends on carryonlib, which must be auto-resolved.
 if [[ "$EXPECT_DOTNET" == "10" ]]; then
   docker exec "$cid" sh -c 'ls /data/Mods' | grep -qi carryonlib || fail "dependency carryonlib not resolved"
   pass "dependency carryonlib resolved automatically"

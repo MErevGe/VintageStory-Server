@@ -8,8 +8,6 @@ FROM mcr.microsoft.com/dotnet/runtime:${DOTNET_VERSION}
 LABEL org.opencontainers.image.title="vintagestory-server" \
       org.opencontainers.image.description="Vintage Story dedicated server with automatic version and mod downloading"
 
-# The Ubuntu base ships a default user at UID/GID 1000; remove it so the service
-# user can own 1000 (the entrypoint remaps to PUID/PGID at runtime).
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends ca-certificates curl jq gosu unzip; \

@@ -26,7 +26,6 @@ if [[ "$(id -u)" == "0" ]]; then
   RUN_AS=(gosu "${PUID}:${PGID}")
 fi
 
-# Build the mod list from VS_MODS (newline/space/comma separated).
 EFFECTIVE_MODS="${DATA_DIR}/.mods.txt"
 rm -f "$EFFECTIVE_MODS"
 if [[ -n "${VS_MODS:-}" ]]; then
@@ -59,7 +58,6 @@ setconfig="$(jq -nc \
 
 cd "$SERVER_DIR"
 
-# --setconfig writes the values and exits, so run it before starting the server.
 if [[ -n "$setconfig" && "$setconfig" != "{}" ]]; then
   log "Applying serverconfig overrides: ${setconfig}"
   "${RUN_AS[@]}" dotnet "${SERVER_DIR}/VintagestoryServer.dll" \
@@ -67,6 +65,5 @@ if [[ -n "$setconfig" && "$setconfig" != "{}" ]]; then
 fi
 
 log "Starting Vintage Story server"
-# shellcheck disable=SC2086
 exec "${RUN_AS[@]}" dotnet "${SERVER_DIR}/VintagestoryServer.dll" \
   --dataPath "$DATA_DIR" $EXTRA_ARGS "$@"

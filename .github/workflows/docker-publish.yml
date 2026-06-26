@@ -25,8 +25,6 @@ jobs:
       packages: write
     strategy:
       fail-fast: false
-      # One image variant per .NET version. 'test_vs' pins a VS version that runs
-      # on that .NET for the boot test; 'latest: true' also publishes :latest.
       matrix:
         include:
           - dotnet: "7.0"
@@ -106,8 +104,6 @@ jobs:
           chmod +x tests/smoke-test.sh
           ./tests/smoke-test.sh ${{ steps.tags.outputs.test_tag }}
 
-      # Re-run build with push (cache hit -> fast) and the real tags. Only on
-      # main or version tags, after tests passed.
       - name: Build and push
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
         uses: docker/build-push-action@v6
