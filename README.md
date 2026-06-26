@@ -52,6 +52,7 @@ Set these in the environment and they are applied at every start.
 | `VS_MAX_CLIENTS` | `MaxClients` | |
 | `VS_PASSWORD` | `Password` | join password |
 | `VS_MOTD` | `WelcomeMessage` | |
+| `VS_PORT` | `Port` | game port (default `42420`); the healthcheck follows it |
 
 > Whitelisting: `OnlyWhitelisted` is deprecated since VS 1.20; use
 > `VS_WHITELIST_MODE`. For a dedicated server `0` means the whitelist is **on**.
@@ -111,4 +112,14 @@ both GHCR and Docker Hub.
 ## Notes
 
 - linux/amd64 only.
-- The server saves on stop; `stop_grace_period` is set to 60s.
+- The server saves on stop (SIGTERM); `stop_grace_period` is set to 60s.
+- The image has a healthcheck (TCP on the configured port); `docker ps` shows
+  `healthy` once up. Set a custom port with `VS_PORT` (and map it in `ports:`).
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+Unofficial project. Vintage Story is © [Anego Studios](https://www.anegostudios.com/);
+this repository only packages a dedicated server and does **not** include the game,
+which is downloaded at runtime.

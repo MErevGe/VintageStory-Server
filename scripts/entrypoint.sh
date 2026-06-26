@@ -38,7 +38,7 @@ export MODS_FILE="$EFFECTIVE_MODS"
 "${RUN_AS[@]}" /app/scripts/install-server.sh
 "${RUN_AS[@]}" /app/scripts/download-mods.sh
 
-for var in VS_WHITELIST_MODE VS_MAX_CLIENTS; do
+for var in VS_WHITELIST_MODE VS_MAX_CLIENTS VS_PORT; do
   val="${!var:-}"
   if [[ -n "$val" && ! "$val" =~ ^[0-9]+$ ]]; then
     log "WARNING: ${var}='${val}' is not a number, ignoring."
@@ -49,12 +49,14 @@ done
 setconfig="$(jq -nc \
   --arg whitelist "${VS_WHITELIST_MODE:-}" --arg name "${VS_SERVER_NAME:-}" \
   --arg maxc "${VS_MAX_CLIENTS:-}" --arg pass "${VS_PASSWORD:-}" --arg motd "${VS_MOTD:-}" \
+  --arg port "${VS_PORT:-}" \
   '{}
    | (if $whitelist != "" then .WhitelistMode = ($whitelist|tonumber) else . end)
    | (if $name      != "" then .ServerName    = $name            else . end)
    | (if $maxc      != "" then .MaxClients     = ($maxc|tonumber) else . end)
    | (if $pass      != "" then .Password       = $pass           else . end)
-   | (if $motd      != "" then .WelcomeMessage = $motd           else . end)')"
+   | (if $motd      != "" then .WelcomeMessage = $motd           else . end)
+   | (if $port      != "" then .Port           = ($port|tonumber) else . end)')"
 
 cd "$SERVER_DIR"
 

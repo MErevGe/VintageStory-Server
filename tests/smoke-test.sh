@@ -59,7 +59,7 @@ pass "VS_MODS built the mod list"
 
 sec "6/7 Server boots, mod downloads, serverconfig applies"
 cid="$(docker run -d -v "${vol}:/data" \
-  -e VS_MODS=carryon -e VS_WHITELIST_MODE=1 -e VS_SERVER_NAME="CI Test Server" \
+  -e VS_MODS=carryon -e VS_WHITELIST_MODE=1 -e VS_SERVER_NAME="CI Test Server" -e VS_PORT=42999 \
   "${VS_ARGS[@]}" "$IMAGE")"
 deadline=$((SECONDS + BOOT_TIMEOUT)); booted=0
 while (( SECONDS < deadline )); do
@@ -71,6 +71,15 @@ while (( SECONDS < deadline )); do
 done
 (( booted == 1 )) || { docker logs "$cid" 2>&1 | tail -n 30; fail "server did not boot in ${BOOT_TIMEOUT}s"; }
 pass "server booted"
+
+hc=""; hcdeadline=$((SECONDS + 90))
+while (( SECONDS < hcdeadline )); do
+  hc="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$cid" 2>/dev/null || true)"
+  [[ "$hc" == "healthy" ]] && break
+  sleep 5
+done
+[[ "$hc" == "healthy" ]] || fail "container did not become healthy (status: ${hc:-none})"
+pass "healthcheck reports healthy"
 
 docker exec "$cid" sh -c 'ls /data/Mods/*.zip >/dev/null 2>&1' || fail "no mod downloaded"
 docker exec "$cid" sh -c 'ls /data/Mods' | grep -qi carryon || fail "carryon not downloaded"
@@ -84,7 +93,8 @@ fi
 cfg="$(docker exec "$cid" sh -c 'cat /data/serverconfig.json' 2>/dev/null || true)"
 [[ "$(jq -r '.WhitelistMode' <<<"$cfg" 2>/dev/null)" == "1" ]] || fail "WhitelistMode not applied"
 [[ "$(jq -r '.ServerName' <<<"$cfg" 2>/dev/null)" == "CI Test Server" ]] || fail "ServerName not applied"
-pass "serverconfig overrides applied"
+[[ "$(jq -r '.Port' <<<"$cfg" 2>/dev/null)" == "42999" ]] || fail "VS_PORT not applied"
+pass "serverconfig overrides applied (incl. custom port; healthcheck followed it)"
 
 sec "7/7 Restart reuses cached server (no re-download)"
 docker stop "$cid" >/dev/null 2>&1 || true

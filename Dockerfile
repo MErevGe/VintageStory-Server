@@ -33,4 +33,8 @@ ENV VS_CHANNEL=stable \
 
 VOLUME ["/data"]
 EXPOSE 42420/tcp 42420/udp
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=300s --retries=3 \
+  CMD bash -c 'p=$(jq -r ".Port // 42420" "${DATA_DIR}/serverconfig.json" 2>/dev/null || echo 42420); </dev/tcp/127.0.0.1/$p' || exit 1
+
 ENTRYPOINT ["/app/scripts/entrypoint.sh"]
