@@ -9,7 +9,7 @@ PGID="${PGID:-1000}"
 DATA_DIR="${DATA_DIR:-/data}"
 SERVER_DIR="${SERVER_DIR:-${DATA_DIR}/.server}"
 EXTRA_ARGS="${EXTRA_ARGS:-}"
-export SERVER_DIR
+export SERVER_DIR DATA_DIR
 export MODS_DIR="${DATA_DIR}/Mods"
 
 log() { echo "[entrypoint] $*"; }
@@ -37,6 +37,17 @@ export MODS_FILE="$EFFECTIVE_MODS"
 
 "${RUN_AS[@]}" /app/scripts/install-server.sh
 "${RUN_AS[@]}" /app/scripts/download-mods.sh
+cd "$SERVER_DIR"
+
+# Ensure a full default serverconfig.json exists (VS needs e.g. the Roles array to
+# match DefaultRoleCode), then merge a config token (if set) into it — both before
+# the env overrides below, which therefore win.
+if [[ ! -f "${DATA_DIR}/serverconfig.json" ]]; then
+  log "Generating default serverconfig.json"
+  "${RUN_AS[@]}" dotnet "${SERVER_DIR}/VintagestoryServer.dll" \
+    --dataPath "$DATA_DIR" --setconfig='{}' >/dev/null 2>&1 || true
+fi
+"${RUN_AS[@]}" /app/scripts/apply-config-token.sh
 
 for var in VS_WHITELIST_MODE VS_MAX_CLIENTS VS_PORT; do
   val="${!var:-}"
@@ -57,8 +68,6 @@ setconfig="$(jq -nc \
    | (if $pass      != "" then .Password       = $pass           else . end)
    | (if $motd      != "" then .WelcomeMessage = $motd           else . end)
    | (if $port      != "" then .Port           = ($port|tonumber) else . end)')"
-
-cd "$SERVER_DIR"
 
 if [[ -n "$setconfig" && "$setconfig" != "{}" ]]; then
   log "Applying serverconfig overrides: ${setconfig}"

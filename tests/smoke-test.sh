@@ -29,9 +29,9 @@ wait_exec() {
 
 sec "1/7 Required tools"
 docker run --rm --entrypoint bash "$IMAGE" -lc \
-  'command -v curl && command -v jq && command -v gosu && command -v dotnet && command -v unzip' >/dev/null \
+  'command -v curl && command -v jq && command -v gosu && command -v dotnet && command -v unzip && command -v python3' >/dev/null \
   || fail "missing tool"
-pass "curl, jq, gosu, dotnet, unzip"
+pass "curl, jq, gosu, dotnet, unzip, python3"
 
 sec "2/7 .NET ${EXPECT_DOTNET} runtime"
 docker run --rm --entrypoint dotnet "$IMAGE" --list-runtimes \
@@ -40,7 +40,7 @@ pass ".NET ${EXPECT_DOTNET} present"
 
 sec "3/7 Scripts executable"
 docker run --rm --entrypoint bash "$IMAGE" -lc \
-  'test -x /app/scripts/entrypoint.sh && test -x /app/scripts/install-server.sh && test -x /app/scripts/download-mods.sh' \
+  'test -x /app/scripts/entrypoint.sh && test -x /app/scripts/install-server.sh && test -x /app/scripts/download-mods.sh && test -x /app/scripts/apply-config-token.sh' \
   || fail "scripts missing"
 pass "scripts present"
 
@@ -57,9 +57,13 @@ wait_exec "$mc" 'grep -qx carryon /data/.mods.txt && grep -qx "foo@1.2.3" /data/
 docker rm -f "$mc" >/dev/null 2>&1; mc=""
 pass "VS_MODS built the mod list"
 
-sec "6/7 Server boots, mod downloads, serverconfig applies"
+sec "6/7 Server boots, mod downloads, serverconfig + config token apply"
+# v3 token (VS-Config-Generator format): raw-DEFLATE compressed, base64url.
+tok_payload='{"world":{"WorldName":"Test","Seed":"99","PlayStyle":"exploration","MapSizeY":384},"worldConfiguration":{"gameMode":"survival","globalTemperature":"1.5"},"server":{"ServerName":"Token Name","MaxClients":32,"AllowPvP":false}}'
+CONFIG_TOKEN="v3.$(printf '%s' "$tok_payload" | python3 -c 'import sys,zlib,base64; d=zlib.compress(sys.stdin.buffer.read(),9)[2:-4]; sys.stdout.write(base64.urlsafe_b64encode(d).decode().rstrip(chr(61)))')"
 cid="$(docker run -d -v "${vol}:/data" \
   -e VS_MODS=carryon -e VS_WHITELIST_MODE=1 -e VS_SERVER_NAME="CI Test Server" -e VS_PORT=42999 \
+  -e VS_CONFIG_TOKEN="$CONFIG_TOKEN" \
   "${VS_ARGS[@]}" "$IMAGE")"
 deadline=$((SECONDS + BOOT_TIMEOUT)); booted=0
 while (( SECONDS < deadline )); do
@@ -92,9 +96,24 @@ fi
 
 cfg="$(docker exec "$cid" sh -c 'cat /data/serverconfig.json' 2>/dev/null || true)"
 [[ "$(jq -r '.WhitelistMode' <<<"$cfg" 2>/dev/null)" == "1" ]] || fail "WhitelistMode not applied"
-[[ "$(jq -r '.ServerName' <<<"$cfg" 2>/dev/null)" == "CI Test Server" ]] || fail "ServerName not applied"
+[[ "$(jq -r '.ServerName' <<<"$cfg" 2>/dev/null)" == "CI Test Server" ]] || fail "ServerName not applied (env should win over token)"
 [[ "$(jq -r '.Port' <<<"$cfg" 2>/dev/null)" == "42999" ]] || fail "VS_PORT not applied"
 pass "serverconfig overrides applied (incl. custom port; healthcheck followed it)"
+
+# Config token: token values applied, env wins on overlap (ServerName above).
+[[ "$(jq -r '.MaxClients' <<<"$cfg" 2>/dev/null)" == "32" ]] || fail "token MaxClients not applied"
+[[ "$(jq -r '.WorldConfig.WorldConfiguration.globalTemperature' <<<"$cfg" 2>/dev/null)" == "1.5" ]] || fail "token worldConfiguration not applied"
+[[ "$(jq -r '.WorldConfig.PlayStyle' <<<"$cfg" 2>/dev/null)" == "exploration" ]] || fail "token PlayStyle not applied"
+[[ "$(jq -r '.MapSizeY' <<<"$cfg" 2>/dev/null)" == "384" ]] || fail "token map height not applied to top-level MapSizeY"
+pass "config token applied (world config, playstyle, top-level map height)"
+
+# Applying a world-carrying token when a world already exists must warn that the
+# world-gen settings won't affect it. Use an isolated DATA_DIR with a stub save so
+# the check is deterministic and never touches the running server's database.
+docker exec "$cid" sh -c 'mkdir -p /tmp/wt/Saves && : > /tmp/wt/Saves/stub.vcdbs && echo "{}" > /tmp/wt/serverconfig.json'
+warnout="$(docker exec -e DATA_DIR=/tmp/wt -e VS_CONFIG_TOKEN="$CONFIG_TOKEN" "$cid" /app/scripts/apply-config-token.sh 2>&1 || true)"
+grep -qi 'world already exists' <<<"$warnout" || fail "no warning when applying world token over an existing world"
+pass "warns that world settings are ignored for an existing world"
 
 sec "7/7 Restart reuses cached server (no re-download)"
 docker stop "$cid" >/dev/null 2>&1 || true

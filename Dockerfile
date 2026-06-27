@@ -10,7 +10,7 @@ LABEL org.opencontainers.image.title="vintagestory-server" \
 
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends ca-certificates curl jq gosu unzip; \
+    apt-get install -y --no-install-recommends ca-certificates curl jq gosu unzip python3; \
     rm -rf /var/lib/apt/lists/*; \
     userdel -r ubuntu 2>/dev/null || true; \
     groupdel ubuntu 2>/dev/null || true; \

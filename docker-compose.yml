@@ -19,6 +19,9 @@ services:
       # VS_MAX_CLIENTS: "16"
       # VS_PASSWORD: ""
       # VS_MOTD: "Welcome {0}, may you survive well and prosper"
+      # VS_PORT: "42420"       # also map it in ports: below
+      # Full config from https://merevge.github.io/VS-Config-Generator (Token tab):
+      # VS_CONFIG_TOKEN: v3....
       # Mods to auto-download (one id per line); dependencies are resolved too.
       # VS_MODS: |
       #   carryon

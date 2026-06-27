@@ -57,6 +57,29 @@ Set these in the environment and they are applied at every start.
 > Whitelisting: `OnlyWhitelisted` is deprecated since VS 1.20; use
 > `VS_WHITELIST_MODE`. For a dedicated server `0` means the whitelist is **on**.
 
+### Config token
+
+Build a full configuration (world generation, server settings, roles) with the
+[VS-Config-Generator](https://merevge.github.io/VS-Config-Generator/), copy the
+token from its **Token** tab, and set it as `VS_CONFIG_TOKEN`:
+
+```yaml
+    environment:
+      VS_CONFIG_TOKEN: v3....
+```
+
+It is merged into `serverconfig.json` before the server starts. It re-applies only
+when the token changes, so your own edits survive restarts. The individual `VS_*`
+variables above take precedence over the token on overlapping keys.
+
+> **World-generation settings apply only to a new world.** Play style, seed, map
+> height and the world-configuration block are read by Vintage Story **only when a
+> world is first created**. If `data/Saves` already contains a world, those values
+> are written to `serverconfig.json` but the existing world keeps its baked-in
+> settings (the container logs a warning when this happens). To regenerate the
+> world with the token's settings, delete `data/Saves`. Server settings such as
+> name, slot count and PvP are not tied to the save and apply on every start.
+
 ## Mods
 
 List the mods in the `VS_MODS` environment variable — one id per line (a YAML
