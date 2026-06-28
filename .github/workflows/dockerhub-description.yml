@@ -1,0 +1,40 @@
+name: Update Docker Hub description
+
+# Sync DOCKERHUB.md to the Docker Hub repository's overview. Runs only when that
+# file (or this workflow) changes, so it does not need the image build. The step
+# is skipped where the Docker Hub secrets are not set (e.g. the private mirror),
+# so the description is only updated from the repository that pushes to Docker Hub.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - DOCKERHUB.md
+      - .github/workflows/dockerhub-description.yml
+  workflow_dispatch:
+
+env:
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+
+jobs:
+  description:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Compute Docker Hub repository
+        id: repo
+        if: env.DOCKERHUB_USERNAME != ''
+        run: |
+          name="${GITHUB_REPOSITORY,,}"   # owner/name, lowercased
+          echo "repo=${DOCKERHUB_USERNAME}/${name##*/}" >> "$GITHUB_OUTPUT"
+
+      - name: Update Docker Hub description
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ steps.repo.outputs.repo }}
+          readme-filepath: ./DOCKERHUB.md
