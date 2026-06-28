@@ -1,0 +1,49 @@
+name: Clean up GHCR images
+
+# Periodically remove leftover image versions (untagged build remnants and
+# orphaned attestation/referrer artifacts). Child manifests of tagged images
+# (the platform image plus its SBOM/provenance) are preserved automatically, and
+# the current tags are additionally protected via exclude-tags. The package name
+# is derived from the repository, so this same file cleans the right package in
+# both the private source repo and the public mirror.
+
+on:
+  schedule:
+    - cron: "0 4 * * 1"   # weekly, Monday 04:00 UTC
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Log deletions without performing them"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    env:
+      # Classic PAT with delete:packages + read:packages. The default GITHUB_TOKEN
+      # cannot delete versions of user-owned packages. Skips when unset.
+      CLEANUP_TOKEN: ${{ secrets.CLEANUP_TOKEN }}
+    steps:
+      - name: Resolve package name (lowercased repo name)
+        id: pkg
+        run: |
+          name="${GITHUB_REPOSITORY##*/}"
+          echo "name=${name,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Clean up image versions
+        if: env.CLEANUP_TOKEN != ''
+        uses: dataaxiom/ghcr-cleanup-action@v1
+        with:
+          package: ${{ steps.pkg.outputs.name }}
+          token: ${{ secrets.CLEANUP_TOKEN }}
+          exclude-tags: latest,dotnet7,dotnet8,dotnet10
+          delete-untagged: true
+          delete-orphaned-images: true
+          delete-partial-images: true
+          older-than: 7 days
+          dry-run: ${{ inputs.dry-run || false }}
