@@ -1,0 +1,60 @@
+name: Bug report
+description: Something is not working as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a report. Please fill in as much as you can.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the problem and what you expected instead.
+    validations:
+      required: true
+
+  - type: input
+    id: image
+    attributes:
+      label: Image tag
+      description: Which image and tag are you running?
+      placeholder: "ghcr.io/merevge/vintagestory-server:dotnet10"
+    validations:
+      required: true
+
+  - type: input
+    id: vs-version
+    attributes:
+      label: Vintage Story version
+      description: Resolved server version (or the VS_VERSION you pinned).
+      placeholder: "1.22.3"
+    validations:
+      required: false
+
+  - type: textarea
+    id: compose
+    attributes:
+      label: Configuration
+      description: Your compose service or the environment variables you set. Redact any passwords.
+      render: yaml
+    validations:
+      required: false
+
+  - type: input
+    id: config-token
+    attributes:
+      label: Config token (optional)
+      description: If the issue relates to VS_CONFIG_TOKEN, paste it here. It contains no secrets.
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Output of `docker compose logs` around the problem. This is rendered as a code block.
+      render: shell
+    validations:
+      required: false
