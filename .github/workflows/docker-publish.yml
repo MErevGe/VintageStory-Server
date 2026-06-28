@@ -128,7 +128,7 @@ jobs:
       # artifact attestations are not available for user-owned private repos.
       - name: Attest build provenance (GHCR)
         if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && github.event.repository.private == false
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-name: ${{ steps.tags.outputs.ghcr_ref }}
           subject-digest: ${{ steps.build.outputs.digest }}
