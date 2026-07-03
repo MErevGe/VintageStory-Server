@@ -3,11 +3,9 @@ name: Build, test and publish container
 on:
   push:
     branches: [main]
-    tags: ["v*.*.*"]
     paths-ignore: ['**.md', 'LICENSE', '.gitignore', 'docker-compose.yml']
   pull_request:
     branches: [main]
-    paths-ignore: ['**.md', 'LICENSE', '.gitignore', 'docker-compose.yml']
   workflow_dispatch:
 
 env:
@@ -46,14 +44,14 @@ jobs:
             latest: "true"
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c  # v4
 
       - name: Log in to GHCR
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4
+        uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4  # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -61,7 +59,7 @@ jobs:
 
       - name: Log in to Docker Hub
         if: github.event_name != 'pull_request' && env.DOCKERHUB_USERNAME != ''
-        uses: docker/login-action@v4
+        uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4  # v4
         with:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -89,7 +87,7 @@ jobs:
           echo "ghcr_ref=${REGISTRY}/${image}" >> "$GITHUB_OUTPUT"
 
       - name: Build image for testing (.NET ${{ matrix.dotnet }})
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7
         with:
           context: .
           platforms: linux/amd64
@@ -109,8 +107,8 @@ jobs:
 
       - name: Build and push
         id: build
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-        uses: docker/build-push-action@v7
+        if: github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7
         with:
           context: .
           platforms: linux/amd64
@@ -127,9 +125,25 @@ jobs:
       # the in-image provenance/SBOM attached above. Only runs on a public repo:
       # artifact attestations are not available for user-owned private repos.
       - name: Attest build provenance (GHCR)
-        if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && github.event.repository.private == false
-        uses: actions/attest-build-provenance@v4
+        if: github.ref == 'refs/heads/main' && github.event.repository.private == false
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373  # v4
         with:
           subject-name: ${{ steps.tags.outputs.ghcr_ref }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
+
+  # Single stable check to require in branch protection (the matrix job names vary
+  # with the tested VS version). Fails unless every matrix leg succeeded.
+  ci-gate:
+    name: CI gate
+    needs: build-test-push
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the build to have succeeded
+        run: |
+          if [ "${{ needs.build-test-push.result }}" != "success" ]; then
+            echo "build-test-push result: ${{ needs.build-test-push.result }}"
+            exit 1
+          fi
+          echo "all matrix builds passed"

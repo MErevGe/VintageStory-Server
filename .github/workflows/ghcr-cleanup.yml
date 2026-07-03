@@ -37,7 +37,7 @@ jobs:
 
       - name: Clean up image versions
         if: env.CLEANUP_TOKEN != ''
-        uses: dataaxiom/ghcr-cleanup-action@v1
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f  # v1
         with:
           package: ${{ steps.pkg.outputs.name }}
           token: ${{ secrets.CLEANUP_TOKEN }}
