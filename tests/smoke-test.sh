@@ -63,6 +63,7 @@ tok_payload='{"world":{"WorldName":"Test","Seed":"99","PlayStyle":"exploration",
 CONFIG_TOKEN="v3.$(printf '%s' "$tok_payload" | python3 -c 'import sys,zlib,base64; d=zlib.compress(sys.stdin.buffer.read(),9)[2:-4]; sys.stdout.write(base64.urlsafe_b64encode(d).decode().rstrip(chr(61)))')"
 cid="$(docker run -d -v "${vol}:/data" \
   -e VS_MODS=carryon -e VS_WHITELIST_MODE=1 -e VS_SERVER_NAME="CI Test Server" -e VS_PORT=42999 \
+  -e VS_PASSWORD="cipw-s3cret" \
   -e VS_CONFIG_TOKEN="$CONFIG_TOKEN" \
   "${VS_ARGS[@]}" "$IMAGE")"
 deadline=$((SECONDS + BOOT_TIMEOUT)); booted=0
@@ -100,6 +101,12 @@ cfg="$(docker exec "$cid" sh -c 'cat /data/serverconfig.json' 2>/dev/null || tru
 [[ "$(jq -r '.Port' <<<"$cfg" 2>/dev/null)" == "42999" ]] || fail "VS_PORT not applied"
 pass "serverconfig overrides applied (incl. custom port; healthcheck followed it)"
 
+[[ "$(jq -r '.Password' <<<"$cfg" 2>/dev/null)" == "cipw-s3cret" ]] || fail "VS_PASSWORD not applied"
+bootlog="$(docker logs "$cid" 2>&1 || true)"
+grep -qF 'cipw-s3cret' <<<"$bootlog" && fail "password leaked to container logs"
+grep -qF '"Password":"***"' <<<"$bootlog" || fail "masked password missing from override log"
+pass "password applied but masked in logs"
+
 # Config token: token values applied, env wins on overlap (ServerName above).
 [[ "$(jq -r '.MaxClients' <<<"$cfg" 2>/dev/null)" == "32" ]] || fail "token MaxClients not applied"
 [[ "$(jq -r '.WorldConfig.WorldConfiguration.globalTemperature' <<<"$cfg" 2>/dev/null)" == "1.5" ]] || fail "token worldConfiguration not applied"
@@ -114,6 +121,13 @@ docker exec "$cid" sh -c 'mkdir -p /tmp/wt/Saves && : > /tmp/wt/Saves/stub.vcdbs
 warnout="$(docker exec -e DATA_DIR=/tmp/wt -e VS_CONFIG_TOKEN="$CONFIG_TOKEN" "$cid" /app/scripts/apply-config-token.sh 2>&1 || true)"
 grep -qi 'world already exists' <<<"$warnout" || fail "no warning when applying world token over an existing world"
 pass "warns that world settings are ignored for an existing world"
+
+bomb="v3.$(python3 -c 'import sys,zlib,base64; sys.stdout.write(base64.urlsafe_b64encode(zlib.compress(b"\x00"*(8<<20),9)[2:-4]).decode().rstrip(chr(61)))')"
+docker exec "$cid" sh -c 'echo "{\"ServerName\":\"keep\"}" > /tmp/wt/serverconfig.json'
+bombout="$(docker exec -e DATA_DIR=/tmp/wt -e VS_CONFIG_TOKEN="$bomb" "$cid" /app/scripts/apply-config-token.sh 2>&1 || true)"
+grep -qi 'invalid or oversized' <<<"$bombout" || fail "oversized token not rejected"
+[[ "$(docker exec "$cid" sh -c 'jq -r .ServerName /tmp/wt/serverconfig.json')" == "keep" ]] || fail "config changed by rejected token"
+pass "oversized token rejected, config untouched"
 
 sec "7/7 Restart reuses cached server (no re-download)"
 docker stop "$cid" >/dev/null 2>&1 || true
