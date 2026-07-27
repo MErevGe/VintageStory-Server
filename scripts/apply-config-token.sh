@@ -22,20 +22,29 @@ fi
 # this needs a zlib raw-inflate (Python stdlib), not gunzip/unzip.
 payload="$(VS_TOKEN="$TOKEN" python3 - <<'PY' 2>/dev/null || true
 import os, sys, base64, zlib
+MAX_DECODED = 1 << 20
+MAX_INPUT = 2 << 20
 tok = (os.environ.get("VS_TOKEN") or "").strip()
 ver, _, pl = tok.partition(".")
 pl += "=" * (-len(pl) % 4)
 try:
+    if len(pl) > MAX_INPUT:
+        raise ValueError("input too large")
     raw = base64.urlsafe_b64decode(pl.encode())
     if ver == "v3":
-        raw = zlib.decompress(raw, -15)
+        d = zlib.decompressobj(-15)
+        raw = d.decompress(raw, MAX_DECODED)
+        if d.unconsumed_tail or not d.eof:
+            raise ValueError("payload too large")
+    if len(raw) > MAX_DECODED:
+        raise ValueError("payload too large")
     sys.stdout.write(raw.decode("utf-8"))
 except Exception:
     sys.exit(1)
 PY
 )"
 if [[ -z "$payload" ]] || ! printf '%s' "$payload" | jq -e . >/dev/null 2>&1; then
-  log "WARNING: token payload could not be decoded, skipping."; exit 0
+  log "WARNING: invalid or oversized VS_CONFIG_TOKEN payload, skipping (config unchanged)."; exit 0
 fi
 
 # World-gen settings (PlayStyle, Seed, WorldConfiguration, map height) are only

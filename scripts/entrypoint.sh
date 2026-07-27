@@ -70,9 +70,17 @@ setconfig="$(jq -nc \
    | (if $port      != "" then .Port           = ($port|tonumber) else . end)')"
 
 if [[ -n "$setconfig" && "$setconfig" != "{}" ]]; then
-  log "Applying serverconfig overrides: ${setconfig}"
-  "${RUN_AS[@]}" dotnet "${SERVER_DIR}/VintagestoryServer.dll" \
-    --dataPath "$DATA_DIR" "--setconfig=${setconfig}" || true
+  loggable="$(printf '%s' "$setconfig" | jq -c 'if has("Password") then .Password = "***" else . end')"
+  log "Applying serverconfig overrides: ${loggable}"
+  # stdin, not argv, so the password never reaches a process command line.
+  CFG="${DATA_DIR}/serverconfig.json"
+  if [[ -f "$CFG" ]] \
+     && merged="$(printf '%s' "$setconfig" | jq -n --slurpfile base "$CFG" 'input as $o | $base[0] * $o' 2>/dev/null)" \
+     && [[ -n "$merged" ]]; then
+    printf '%s\n' "$merged" > "$CFG"
+  else
+    log "WARNING: could not apply serverconfig overrides."
+  fi
 fi
 
 log "Starting Vintage Story server"

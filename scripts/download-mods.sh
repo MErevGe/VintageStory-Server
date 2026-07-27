@@ -65,6 +65,19 @@ while (( i < ${#queue[@]} )); do
   filename="$(echo "$release" | jq -r '.filename')"
   modver="$(echo "$release" | jq -r '.modversion')"
   dlurl="$(echo "$release" | jq -r '.mainfile')"
+
+  filename="$(basename -- "$filename")"
+  case "$filename" in ''|.|..) log "ERROR: bad filename for '${modid}'"; errors=$((errors+1)); continue ;; esac
+  case "$filename" in
+    *.zip|*.cs|*.dll) ;;
+    *) log "ERROR: unexpected file type for '${modid}' (${filename})"; errors=$((errors+1)); continue ;;
+  esac
+  host="${dlurl#https://}"; host="${host%%/*}"
+  case "$host" in
+    vintagestory.at|*.vintagestory.at) ;;
+    *) log "ERROR: refusing download for '${modid}' from '${host}'"; errors=$((errors+1)); continue ;;
+  esac
+
   target="${MODS_DIR}/${filename}"
   echo "$filename" >> "$keep_list"
 
@@ -95,6 +108,8 @@ done
 
 while IFS= read -r oldfile; do
   [[ -z "$oldfile" ]] && continue
+  oldfile="$(basename -- "$oldfile")"
+  case "$oldfile" in ''|.|..) continue ;; esac
   if ! grep -qxF "$oldfile" "$keep_list"; then
     log "removing stale mod: ${oldfile}"; rm -f "${MODS_DIR}/${oldfile}"
   fi
