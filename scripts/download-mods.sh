@@ -65,6 +65,7 @@ while (( i < ${#queue[@]} )); do
   filename="$(echo "$release" | jq -r '.filename')"
   modver="$(echo "$release" | jq -r '.modversion')"
   dlurl="$(echo "$release" | jq -r '.mainfile')"
+  dlurl="${dlurl// /%20}"
 
   filename="$(basename -- "$filename")"
   case "$filename" in ''|.|..) log "ERROR: bad filename for '${modid}'"; errors=$((errors+1)); continue ;; esac

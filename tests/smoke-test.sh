@@ -7,6 +7,8 @@ IMAGE="${1:?usage: smoke-test.sh <image>}"
 BOOT_TIMEOUT="${BOOT_TIMEOUT:-300}"
 EXPECT_DOTNET="${EXPECT_DOTNET:-10}"
 TEST_VS_VERSION="${TEST_VS_VERSION:-}"
+TEST_MODS="carryon"
+[[ "$EXPECT_DOTNET" == "10" ]] && TEST_MODS="carryon@2.0.0-pre.8 xlibfork@1.0.39"
 VS_ARGS=(); [[ -n "$TEST_VS_VERSION" ]] && VS_ARGS=(-e "VS_VERSION=${TEST_VS_VERSION}")
 
 pass() { echo "  PASS: $*"; }
@@ -62,7 +64,7 @@ sec "6/7 Server boots, mod downloads, serverconfig + config token apply"
 tok_payload='{"world":{"WorldName":"Test","Seed":"99","PlayStyle":"exploration","MapSizeY":384},"worldConfiguration":{"gameMode":"survival","globalTemperature":"1.5"},"server":{"ServerName":"Token Name","MaxClients":32,"AllowPvP":false}}'
 CONFIG_TOKEN="v3.$(printf '%s' "$tok_payload" | python3 -c 'import sys,zlib,base64; d=zlib.compress(sys.stdin.buffer.read(),9)[2:-4]; sys.stdout.write(base64.urlsafe_b64encode(d).decode().rstrip(chr(61)))')"
 cid="$(docker run -d -v "${vol}:/data" \
-  -e VS_MODS=carryon -e VS_WHITELIST_MODE=1 -e VS_SERVER_NAME="CI Test Server" -e VS_PORT=42999 \
+  -e VS_MODS="$TEST_MODS" -e VS_WHITELIST_MODE=1 -e VS_SERVER_NAME="CI Test Server" -e VS_PORT=42999 \
   -e VS_PASSWORD="cipw-s3cret" \
   -e VS_CONFIG_TOKEN="$CONFIG_TOKEN" \
   "${VS_ARGS[@]}" "$IMAGE")"
@@ -93,6 +95,9 @@ pass "carryon downloaded at runtime"
 if [[ "$EXPECT_DOTNET" == "10" ]]; then
   docker exec "$cid" sh -c 'ls /data/Mods' | grep -qi carryonlib || fail "dependency carryonlib not resolved"
   pass "dependency carryonlib resolved automatically"
+  docker exec "$cid" unzip -t "/data/Mods/XLib Fork v1.0.39.zip" >/dev/null \
+    || fail "mod download with spaces in the URL failed"
+  pass "mod download with spaces in the URL"
 fi
 
 cfg="$(docker exec "$cid" sh -c 'cat /data/serverconfig.json' 2>/dev/null || true)"
